@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase SCADA Dashboard - Working</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="grid-overlay"></div>
+    
+    <!-- Firebase Authentication Login Screen -->
+    <div id="login-screen" class="login-screen" style="display: none;">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🔐 NEXONIC SCADA</h1>
+                <h2>Secure Access Required</h2>
+                <p>Please authenticate with Google to access the Firebase sensor monitoring dashboard</p>
+            </div>
+            <div class="login-content">
+                <button id="google-login-btn" class="google-login-btn">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Sign in with Google
+                </button>
+                <div class="auth-divider">
+                    <span>OR</span>
+                </div>
+                <button id="demo-login-btn" class="demo-login-btn">
+                    🧪 Continue with Demo User
+                </button>
+                <button id="anonymous-login-btn" class="anonymous-login-btn">
+                    🕵️ Anonymous Access
+                </button>
+                <div class="demo-info">
+                    <p>Demo and Anonymous modes for local development</p>
+                </div>
+                <div class="login-info">
+                    <p>🛡️ Secure authentication via Firebase</p>
+                    <p>📊 Access to real-time sensor monitoring</p>
+                    <p>🏫 GLA University Mathura SCADA System</p>
+                </div>
+                <div id="login-status" class="login-status"></div>
+            </div>
+        </div>
+    </div>
+    
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <h1 class="system-title">SENSOR GRID MONITORING</h1>
+            <div class="system-status">
+                <span class="status-indicator warning" id="status-indicator"></span>
+                <span class="status-text" id="status-text">INITIALIZING...</span>
+            </div>
+        </div>
+        <div class="top-bar-center">
+            <div class="datetime-display">
+                <div class="date" id="current-date"></div>
+                <div class="time" id="current-time"></div>
+            </div>
+        </div>
+        <div class="top-bar-right">
+            <div id="user-info" class="user-info" style="display: none;">
+                <img id="user-avatar" class="user-avatar" src="" alt="User">
+                <span id="user-name" class="user-name"></span>
+                <button id="logout-btn" class="logout-btn">🚪 Logout</button>
+            </div>
+            <button class="mode-toggle active">NORMAL</button>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <!-- Left Sidebar -->
+        <aside class="left-sidebar">
+            <div class="panel">
+                <h3 class="panel-title">SYSTEM OVERVIEW</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-devices">0</div>
+                        <div class="stat-label">Total Devices</div>
+                    </div>
+                    <div class="stat-item online">
+                        <div class="stat-value" id="online-devices">0</div>
+                        <div class="stat-label">Online</div>
+                    </div>
+                    <div class="stat-item warning">
+                        <div class="stat-value" id="warning-devices">0</div>
+                        <div class="stat-label">Warning</div>
+                    </div>
+                    <div class="stat-item offline">
+                        <div class="stat-value" id="offline-devices">0</div>
+                        <div class="stat-label">Offline</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">POWER GRID STATUS</h3>
+                <div class="grid-metrics">
+                    <div class="grid-metric">
+                        <span class="metric-label">AVG VOLTAGE</span>
+                        <span class="metric-value" id="avg-voltage">-</span>
+                    </div>
+                    <div class="grid-metric">
+                        <span class="metric-label">FREQUENCY</span>
+                        <span class="metric-value" id="avg-frequency">-</span>
+                    </div>
+                    <div class="grid-metric">
+                        <span class="metric-label">TOTAL POWER</span>
+                        <span class="metric-value" id="total-power">-</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Central Map Area -->
+        <section class="central-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">GLA UNIVERSITY MATHURA - SENSOR LOCATIONS</h3>
+            </div>
+            <div class="map-container">
+                <div id="leaflet-map"></div>
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <span class="legend-marker online"></span>
+                        <span class="legend-text">Online</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-marker warning"></span>
+                        <span class="legend-text">Warning</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-marker offline"></span>
+                        <span class="legend-text">Offline</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Sidebar -->
+        <aside class="right-sidebar">
+            <div class="panel">
+                <h3 class="panel-title">DEVICE DETAILS</h3>
+                <div class="device-details" id="device-details">
+                    <div class="no-selection">
+                        <p>🎯 Click any device on the map or in the list below to view detailed sensor readings</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3 class="panel-title">ENVIRONMENTAL</h3>
+                <div class="environmental-data">
+                    <div class="env-metric">
+                        <span class="env-label">AVG TEMP</span>
+                        <span class="env-value" id="avg-temp">-</span>
+                    </div>
+                    <div class="env-metric">
+                        <span class="env-label">AVG HUMIDITY</span>
+                        <span class="env-value" id="avg-humidity">-</span>
+                    </div>
+                    <div class="env-metric">
+                        <span class="env-label">RAIN DETECTED</span>
+                        <span class="env-value" id="rain-detected">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">DEVICE LIST</h3>
+                <div class="device-list" id="device-list">
+                    <div style="color: #666; text-align: center; padding: 20px;">Loading Firebase data...</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Firebase Integration with Authentication -->
+    <script type="module">
+        console.log('🔥 Initializing Firebase with Authentication...');
+        
+        let map, markerLayer = null;
+        let sensorNodes = [];
+        
+        async function initializeFirebaseWithAuth() {
+            try {
+                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js');
+                const { getDatabase, ref, onValue, get } = await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js');
+                const { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInAnonymously } = await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js');
+
+                console.log('✅ Firebase SDK loaded successfully');
+
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDzzDQ93BCRoGaon1dFUvnGLkq6eOZxU74",
+                    authDomain: "nexonic-a9905.firebaseapp.com",
+                    databaseURL: "https://nexonic-a9905-default-rtdb.firebaseio.com",
+                    projectId: "nexonic-a9905",
+                    storageBucket: "nexonic-a9905.firebasestorage.app",
+                    messagingSenderId: "109586125875",
+                    appId: "1:109586125875:web:def4492ee73ca484e13f46"
+                };
+
+                console.log('🔄 Initializing Firebase app...');
+                const app = initializeApp(firebaseConfig);
+                const database = getDatabase(app);
+                const auth = getAuth(app);
+                const provider = new GoogleAuthProvider();
+                
+                console.log('🔄 Testing database connection...');
+                const testRef = ref(database, 'nodes');
+                const testSnapshot = await get(testRef);
+                
+                if (testSnapshot.exists()) {
+                    console.log('✅ Firebase database connection successful!');
+                    console.log('📊 Available data:', Object.keys(testSnapshot.val()));
+                    
+                    // Make Firebase available globally
+                    window.FirebaseDB = { database, ref, onValue, get };
+                    window.FirebaseAuth = { auth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInAnonymously, provider };
+                    window.FirebaseReady = true;
+                    window.FirebaseStatus = 'connected';
+                    
+                    console.log('✅ Firebase initialized and ready for dashboard');
+                    console.log('🔐 Firebase Authentication enabled');
+                    
+                    // Set up authentication state listener
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            console.log('✅ User signed in:', user.email || user.uid);
+                            window.currentUser = user;
+                            showDashboard();
+                            updateUserUI(user);
+                            
+                            // Initialize dashboard after authentication
+                            initializeDashboard();
+                        } else {
+                            console.log('🔐 User signed out');
+                            window.currentUser = null;
+                            showLoginScreen();
+                        }
+                    });
+                    
+                } else {
+                    throw new Error('No data found in Firebase database');
+                }
+                
+            } catch (error) {
+                console.error('❌ Firebase initialization failed:', error);
+                window.FirebaseReady = false;
+                window.FirebaseStatus = 'error';
+                window.FirebaseError = error.message;
+            }
+        }
+        
+        // Authentication helper functions
+        window.showLoginScreen = function() {
+            document.getElementById('login-screen').style.display = 'flex';
+            document.querySelector('header').style.display = 'none';
+            document.querySelector('main').style.display = 'none';
+            console.log('🔐 Showing login screen');
+        };
+        
+        window.showDashboard = function() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.querySelector('header').style.display = 'flex';
+            document.querySelector('main').style.display = 'flex';
+            console.log('📋 Showing dashboard');
+        };
+        
+        window.updateUserUI = function(user) {
+            const userInfo = document.getElementById('user-info');
+            const userAvatar = document.getElementById('user-avatar');
+            const userName = document.getElementById('user-name');
+            
+            if (user) {
+                userAvatar.src = user.photoURL || 'https://via.placeholder.com/40';
+                userName.textContent = user.displayName || user.email || 'Anonymous User';
+                userInfo.style.display = 'flex';
+                console.log('✅ User UI updated for:', user.email || user.uid);
+            } else {
+                userInfo.style.display = 'none';
+            }
+        };
+        
+        // Google sign-in function
+        window.signInWithGoogle = async function() {
+            if (!window.FirebaseAuth) {
+                console.error('❌ Firebase Auth not initialized');
+                return;
+            }
+            
+            const statusEl = document.getElementById('login-status');
+            statusEl.innerHTML = '🔄 Signing in...';
+            
+            try {
+                const { auth, signInWithPopup, provider } = window.FirebaseAuth;
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                console.log('✅ Google sign-in successful:', user.email);
+                statusEl.innerHTML = '✅ Sign-in successful!';
+                
+            } catch (error) {
+                console.error('❌ Google sign-in failed:', error);
+                
+                let errorMessage = '';
+                if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = '⚠️ Domain not authorized. Use Demo Login for local development.';
+                } else if (error.code === 'auth/popup-closed-by-user') {
+                    errorMessage = '❌ Sign-in cancelled by user.';
+                } else if (error.code === 'auth/popup-blocked') {
+                    errorMessage = '❌ Popup blocked. Please allow popups and try again.';
+                } else {
+                    errorMessage = `❌ Sign-in failed: ${error.message}`;
+                }
+                
+                statusEl.innerHTML = errorMessage;
+                
+                if (error.code === 'auth/unauthorized-domain') {
+                    setTimeout(() => {
+                        statusEl.innerHTML += '<br><br>💡 <strong>Tip:</strong> Use "Continue with Demo User" for local testing';
+                    }, 2000);
+                }
+            }
+        };
+        
+        // Demo login function
+        window.signInWithDemo = function() {
+            console.log('🧪 Demo login activated');
+            
+            const statusEl = document.getElementById('login-status');
+            statusEl.innerHTML = '🔄 Signing in with demo user...';
+            
+            const demoUser = {
+                uid: 'demo-user-firebase',
+                email: 'demo@nexonic-firebase.local',
+                displayName: 'Firebase Demo User',
+                photoURL: 'https://via.placeholder.com/100/00ffff/000000?text=DEMO',
+                emailVerified: true,
+                isDemo: true
+            };
+            
+            setTimeout(() => {
+                window.currentUser = demoUser;
+                statusEl.innerHTML = '✅ Demo login successful!';
+                console.log('✅ Demo user authenticated:', demoUser.email);
+                showDashboard();
+                updateUserUI(demoUser);
+                initializeDashboard();
+            }, 1000);
+        };
+        
+        // Anonymous Firebase authentication
+        window.signInAnonymously = async function() {
+            if (!window.FirebaseAuth) {
+                console.error('❌ Firebase Auth not initialized');
+                return;
+            }
+            
+            const statusEl = document.getElementById('login-status');
+            statusEl.innerHTML = '🔄 Signing in anonymously...';
+            
+            try {
+                const { auth, signInAnonymously } = window.FirebaseAuth;
+                const result = await signInAnonymously(auth);
+                const user = result.user;
+                
+                console.log('✅ Anonymous sign-in successful:', user.uid);
+                statusEl.innerHTML = '✅ Anonymous login successful!';
+                
+            } catch (error) {
+                console.error('❌ Anonymous sign-in failed:', error);
+                statusEl.innerHTML = `❌ Anonymous login failed: ${error.message}`;
+            }
+        };
+        
+        // Sign out function
+        window.signOutUser = async function() {
+            if (!window.FirebaseAuth) {
+                console.error('❌ Firebase Auth not initialized');
+                return;
+            }
+            
+            try {
+                const { auth, signOut } = window.FirebaseAuth;
+                await signOut(auth);
+                console.log('🚀 User signed out successfully');
+            } catch (error) {
+                console.error('❌ Sign out failed:', error);
+            }
+        };
+        
+        // Dashboard initialization function
+        function initializeDashboard() {
+            console.log('🚀 Initializing dashboard components...');
+            
+            initMap();
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Initialize Firebase data loading after authentication
+            initFirebaseData();
+        }
+        
+        // Initialize map
+        function initMap() {
+            if (map) return; // Prevent re-initialization
+            
+            map = L.map('leaflet-map').setView([27.6094, 77.5937], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        // Update date/time
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', { 
+                weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' 
+            }).toUpperCase();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { 
+                hour12: false 
+            });
+        }
+
+        // Node locations
+        const locations = {
+            'NODE_1': { lat: 27.6094, lng: 77.5937, name: 'GLA University Main Campus' },
+            'NODE_2': { lat: 27.6085, lng: 77.5925, name: 'GLA Engineering Block' },
+            'NODE_3': { lat: 27.6102, lng: 77.5948, name: 'GLA Administrative Block' },
+            'NODE_4': { lat: 27.6078, lng: 77.5955, name: 'GLA Student Hostel' },
+            'NODE_5': { lat: 27.60656, lng: 77.59349, name: 'GLA Girls Hostel' }
+        };
+
+        // Selected device
+        let selectedDevice = null;
+        
+        // Device selection function
+        window.selectDevice = function(deviceId) {
+            selectedDevice = sensorNodes.find(d => d.id === deviceId);
+            
+            // Update visual selection in list
+            document.querySelectorAll('.device-list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const selectedListItem = document.querySelector(`[data-device-id="${deviceId}"]`);
+            if (selectedListItem) {
+                selectedListItem.classList.add('selected');
+            }
+            
+            // Update device details
+            updateDeviceDetails();
+            
+            console.log('🎯 Selected device:', selectedDevice.name);
+        };
+        
+        // Update device details panel
+        function updateDeviceDetails() {
+            const detailsContainer = document.getElementById('device-details');
+            
+            if (!selectedDevice) {
+                detailsContainer.innerHTML = '<div class="no-selection"><p>Select a device to view details</p></div>';
+                return;
+            }
+            
+            const device = selectedDevice;
+            const isOffline = device.status === 'OFFLINE';
+            
+            detailsContainer.innerHTML = `
+                <div class="device-info">
+                    <div class="device-header">
+                        <div class="device-id">${device.name}</div>
+                        <div class="device-status ${device.status.toLowerCase()}">${device.status}</div>
+                    </div>
+                    <div class="device-metrics">
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Voltage</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.voltage.toFixed(1) + 'V'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Current</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.current.toFixed(1) + 'A'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Power</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.power.toFixed(1) + 'W'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Health</div>
+                            <div class="metric-value">${device.health}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Temperature</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.temperature.toFixed(1) + '°C'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Humidity</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.humidity + '%'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Light</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.ambientLight + ' lux'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Frequency</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.lineFrequency.toFixed(1) + 'Hz'}</div>
+                        </div>
+                        <div class="metric-item ${isOffline ? 'offline' : ''}">
+                            <div class="metric-label">Power Factor</div>
+                            <div class="metric-value">${isOffline ? 'N/A' : device.powerFactor.toFixed(2)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Update UI with Firebase data
+        function updateDashboard(firebaseData) {
+            console.log('📊 Updating dashboard with:', firebaseData);
+            
+            sensorNodes = Object.entries(firebaseData).map(([nodeId, nodeData]) => ({
+                id: nodeId,
+                name: nodeId.replace('_', ' '),
+                status: nodeData.health && nodeData.health.includes('Maintenance') ? 'WARNING' : 
+                        nodeData.status === 'OFFLINE' ? 'OFFLINE' : 'ONLINE',
+                location: locations[nodeId],
+                voltage: nodeData.voltage || 0,
+                current: nodeData.current || 0,
+                power: nodeData.power || 0,
+                humidity: nodeData.humidity || 0,
+                ambientLight: nodeData.ambientLight || 0,
+                health: nodeData.health || 'Unknown',
+                faultAlarms: nodeData.faultAlarms || 'None',
+                lineFrequency: nodeData.lineFrequency || 50,
+                powerFactor: nodeData.powerFactor || 0.95,
+                temperature: 20 + (nodeData.humidity || 50) * 0.2 + Math.random() * 5 // Estimated temperature
+            }));
+
+            // Update stats
+            const online = sensorNodes.filter(n => n.status === 'ONLINE').length;
+            const warning = sensorNodes.filter(n => n.status === 'WARNING').length;
+            const offline = sensorNodes.filter(n => n.status === 'OFFLINE').length;
+            const total = sensorNodes.length;
+            
+            document.getElementById('total-devices').textContent = total;
+            document.getElementById('online-devices').textContent = online;
+            document.getElementById('warning-devices').textContent = warning;
+            document.getElementById('offline-devices').textContent = offline;
+
+            // Calculate averages (excluding offline devices)
+            const activeNodes = sensorNodes.filter(n => n.status !== 'OFFLINE');
+            const activeDenom = activeNodes.length || 1;
+            
+            const avgVoltage = activeNodes.reduce((sum, n) => sum + n.voltage, 0) / activeDenom;
+            const totalPower = activeNodes.reduce((sum, n) => sum + n.power, 0) / 1000;
+            const avgHumidity = activeNodes.reduce((sum, n) => sum + n.humidity, 0) / activeDenom;
+            const avgTemp = activeNodes.reduce((sum, n) => sum + n.temperature, 0) / activeDenom;
+            const avgFrequency = activeNodes.reduce((sum, n) => sum + n.lineFrequency, 0) / activeDenom;
+            const rainCount = sensorNodes.filter(n => firebaseData[n.id].rainDetected).length;
+
+            document.getElementById('avg-voltage').textContent = avgVoltage.toFixed(1) + 'V';
+            document.getElementById('avg-frequency').textContent = avgFrequency.toFixed(1) + 'Hz';
+            document.getElementById('total-power').textContent = totalPower.toFixed(1) + 'kW';
+            document.getElementById('avg-temp').textContent = avgTemp.toFixed(1) + '°C';
+            document.getElementById('avg-humidity').textContent = Math.round(avgHumidity) + '%';
+            document.getElementById('rain-detected').textContent = rainCount + ' LOCATIONS';
+
+            // Update map
+            if (markerLayer) {
+                markerLayer.clearLayers();
+                sensorNodes.forEach(node => {
+                    const color = node.status === 'ONLINE' ? '#39ff14' : 
+                                 node.status === 'WARNING' ? '#ff6600' : '#ff0040';
+                    const marker = L.circleMarker([node.location.lat, node.location.lng], {
+                        radius: 8,
+                        color,
+                        fillColor: color,
+                        fillOpacity: 0.9,
+                        weight: 2
+                    }).addTo(markerLayer);
+                    
+                    marker.on('click', () => selectDevice(node.id));
+                    marker.bindPopup(`
+                        <strong>${node.name}</strong><br/>
+                        Status: ${node.status}<br/>
+                        Health: ${node.health}<br/>
+                        Power: ${node.power}W<br/>
+                        Voltage: ${node.voltage}V<br/>
+                        Humidity: ${node.humidity}%
+                    `);
+                });
+            }
+
+            // Update device list with click handlers
+            const deviceList = document.getElementById('device-list');
+            deviceList.innerHTML = sensorNodes.map(node => `
+                <div class="device-list-item ${node.status.toLowerCase()}" data-device-id="${node.id}" onclick="selectDevice('${node.id}')" style="cursor: pointer;">
+                    <div>
+                        <div class="device-name">${node.name}</div>
+                        <div class="device-location">${node.location.name}</div>
+                    </div>
+                    <div class="device-status ${node.status.toLowerCase()}">${node.status}</div>
+                </div>
+            `).join('');
+            
+            // Update selected device details if device was previously selected
+            if (selectedDevice) {
+                const updatedSelectedDevice = sensorNodes.find(node => node.id === selectedDevice.id);
+                if (updatedSelectedDevice) {
+                    selectedDevice = updatedSelectedDevice;
+                    updateDeviceDetails();
+                }
+            }
+        }
+
+        // Initialize Firebase data loading
+        async function initFirebaseData() {
+            try {
+                document.getElementById('status-text').textContent = 'FIREBASE CONNECTING...';
+                
+                const { database, ref, onValue } = window.FirebaseDB;
+                const nodesRef = ref(database, 'nodes');
+
+                // Set up real-time listener
+                onValue(nodesRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        console.log('✅ Firebase data received:', snapshot.val());
+                        updateDashboard(snapshot.val());
+                        document.getElementById('status-text').textContent = 'FIREBASE CONNECTED';
+                        document.getElementById('status-indicator').className = 'status-indicator online';
+                    } else {
+                        console.warn('⚠️ No Firebase data found');
+                        document.getElementById('status-text').textContent = 'NO DATA';
+                        document.getElementById('status-indicator').className = 'status-indicator offline';
+                    }
+                }, (error) => {
+                    console.error('❌ Firebase error:', error);
+                    document.getElementById('status-text').textContent = 'FIREBASE ERROR';
+                    document.getElementById('status-indicator').className = 'status-indicator offline';
+                });
+
+            } catch (error) {
+                console.error('❌ Firebase data initialization failed:', error);
+                document.getElementById('status-text').textContent = 'FIREBASE ERROR';
+                document.getElementById('status-indicator').className = 'status-indicator offline';
+            }
+        }
+        
+        // Initialize Firebase
+        initializeFirebaseWithAuth();
+    </script>
+    
+    <!-- Authentication Event Handlers -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 DOM loaded, setting up authentication...');
+            
+            // Google login button
+            document.getElementById('google-login-btn').addEventListener('click', () => {
+                console.log('🔐 Google login button clicked');
+                signInWithGoogle();
+            });
+            
+            // Demo login button
+            document.getElementById('demo-login-btn').addEventListener('click', () => {
+                console.log('🧪 Demo login button clicked');
+                signInWithDemo();
+            });
+            
+            // Anonymous login button
+            document.getElementById('anonymous-login-btn').addEventListener('click', () => {
+                console.log('🕵️ Anonymous login button clicked');
+                signInAnonymously();
+            });
+            
+            // Logout button
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                console.log('🚪 Logout button clicked');
+                signOutUser();
+            });
+            
+            // Initially show login screen
+            showLoginScreen();
+        });
+    </script>
+</body>
+</html>

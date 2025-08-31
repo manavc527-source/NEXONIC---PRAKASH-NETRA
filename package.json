@@ -1,0 +1,42 @@
+{
+  "name": "nexonic-scada-dashboard",
+  "version": "2.0.0",
+  "description": "A real-time monitoring dashboard for sensor grid networks with Firebase integration",
+  "main": "firebase-diagnostic.js",
+  "scripts": {
+    "start": "node firebase-diagnostic.js",
+    "test": "node firebase-diagnostic.js",
+    "serve": "npx http-server . -p 8080 -o",
+    "debug": "node --inspect firebase-diagnostic.js"
+  },
+  "keywords": [
+    "scada",
+    "dashboard",
+    "firebase",
+    "sensors",
+    "monitoring",
+    "real-time"
+  ],
+  "author": "Nexonic Team",
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^12.2.1",
+    "firebase-admin": "^13.5.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "local"
+  },
+  "bugs": {
+    "url": "local"
+  },
+  "homepage": "file://index.html"
+}
