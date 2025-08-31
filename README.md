@@ -1,4 +1,4 @@
-# SENSOR GRID MONITORING - Firebase SCADA Dashboard
+# NEXONIC---PRAKASH-NETRA - Firebase SCADA Dashboard
 
 🏫 **GLA University Mathura - IoT Sensor Network Monitoring System**
 
