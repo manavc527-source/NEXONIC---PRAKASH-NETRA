@@ -114,7 +114,8 @@ For production deployment:
 3. Update Firebase security rules
 4. Set environment-specific configurations
 
----
+---                                                                                                                                                                                                                 <img width="1919" height="900" alt="Screenshot 2025-08-31 085904" src="https://github.com/user-attachments/assets/723904d9-7cc2-4451-a1ec-c6a9eb3a950f" />
+
 
 **Developed for GLA University Mathura IoT Research Project**
 *Real-time sensor network monitoring with Firebase integration*
